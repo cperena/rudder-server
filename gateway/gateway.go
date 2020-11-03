@@ -487,9 +487,6 @@ func (gateway *HandleT) userWebRequestWorkerProcess(userWebRequestWorker *userWe
 		for _, eventBatch := range eventBatchesToRecord {
 			writeKey := gjson.Get(eventBatch, "writeKey").Str
 			sourcedebugger.RecordEvent(writeKey, eventBatch)
-			if enableProtocolsFeature && gateway.protocolHandler != nil {
-				gateway.protocolHandler.RecordEventSchema(writeKey, eventBatch)
-			}
 		}
 
 		userWebRequestWorker.batchTimeStat.End()

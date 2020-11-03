@@ -3,6 +3,7 @@ package processor
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rudderlabs/rudder-server/app"
 	"reflect"
 	"sort"
 	"strconv"
@@ -30,6 +31,7 @@ import (
 
 //HandleT is an handle to this object used in main.go
 type HandleT struct {
+	application                  app.Interface
 	backendConfig                backendconfig.BackendConfig
 	processSessions              bool
 	sessionThresholdEvents       int
@@ -71,6 +73,7 @@ type HandleT struct {
 	userJobPQ                    pqT
 	userPQLock                   sync.Mutex
 	logger                       logger.LoggerI
+	protocolHandler              types.ProtocolsI
 }
 
 type DestStatT struct {
@@ -138,8 +141,9 @@ func NewProcessor() *HandleT {
 }
 
 //Setup initializes the module
-func (proc *HandleT) Setup(backendConfig backendconfig.BackendConfig, gatewayDB jobsdb.JobsDB, routerDB jobsdb.JobsDB, batchRouterDB jobsdb.JobsDB, errorDB jobsdb.JobsDB, s stats.Stats) {
+func (proc *HandleT) Setup(application app.Interface, backendConfig backendconfig.BackendConfig, gatewayDB jobsdb.JobsDB, routerDB jobsdb.JobsDB, batchRouterDB jobsdb.JobsDB, errorDB jobsdb.JobsDB, s stats.Stats) {
 	proc.logger = pkgLogger
+	proc.application = application
 	proc.backendConfig = backendConfig
 	proc.stats = s
 
@@ -191,7 +195,9 @@ func (proc *HandleT) Setup(backendConfig backendconfig.BackendConfig, gatewayDB 
 	proc.transformer.Setup()
 
 	proc.crashRecover()
-
+	if proc.application.Features().Protocols != nil {
+		proc.protocolHandler = application.Features().Protocols.Setup()
+	}
 	if proc.processSessions {
 		proc.logger.Info("Starting session processor")
 		rruntime.Go(func() {
@@ -230,6 +236,7 @@ var (
 	configSubscriberLock                sync.RWMutex
 	customDestinations                  []string
 	pkgLogger                           logger.LoggerI
+	enableProtocolsFeature              bool
 )
 
 func loadConfig() {
@@ -244,7 +251,7 @@ func loadConfig() {
 	configProcessSessions = config.GetBool("Processor.processSessions", false)
 	rawDataDestinations = []string{"S3", "GCS", "MINIO", "RS", "BQ", "AZURE_BLOB", "SNOWFLAKE", "POSTGRES", "CLICKHOUSE", "DIGITAL_OCEAN_SPACES"}
 	customDestinations = []string{"KAFKA", "KINESIS", "AZURE_EVENT_HUB"}
-
+	enableProtocolsFeature = config.GetBool("EventSchemas.enableEventSchemasFeature", true)
 	dbReadBatchSize = minDBReadBatchSize
 }
 
@@ -1013,6 +1020,12 @@ func (proc *HandleT) handlePendingGatewayJobs() bool {
 		return false
 	}
 
+	for _, unprocessedJob := range unprocessedList {
+		writeKey := gjson.GetBytes(unprocessedJob.EventPayload, "writeKey").Str
+		if enableProtocolsFeature && proc.protocolHandler != nil {
+			proc.protocolHandler.RecordEventSchema(writeKey, string(unprocessedJob.EventPayload))
+		}
+	}
 	// handle pending jobs
 	proc.statListSort.Start()
 	combinedList := append(unprocessedList, retryList...)
