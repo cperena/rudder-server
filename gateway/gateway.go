@@ -75,7 +75,7 @@ var (
 	enableDedup                                                 bool
 	enableRateLimit                                             bool
 	enableSuppressUserFeature                                   bool
-	enableProtocolsFeature                                      bool
+	enableEventSchemasFeature                                   bool
 	dedupWindow, diagnosisTickerTime                            time.Duration
 	allowReqsWithoutUserIDAndAnonymousID                        bool
 	pkgLogger                                                   logger.LoggerI
@@ -139,7 +139,7 @@ type HandleT struct {
 	userWebRequestWorkers                         []*userWebRequestWorkerT
 	webhookHandler                                *webhook.HandleT
 	suppressUserHandler                           types.SuppressUserI
-	protocolHandler                               types.ProtocolsI
+	eventSchemaHandler                            types.EventSchemasI
 	versionHandler                                func(w http.ResponseWriter, r *http.Request)
 	logger                                        logger.LoggerI
 }
@@ -630,17 +630,17 @@ func (gateway *HandleT) stat(wrappedFunc func(http.ResponseWriter, *http.Request
 	}
 }
 
-func (gateway *HandleT) protocolWebHandler(wrappedFunc func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+func (gateway *HandleT) eventSchemaWebHandler(wrappedFunc func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !enableProtocolsFeature {
-			gateway.logger.Debug("Protocols feature is disabled. You can enabled it through enableProtocolsFeature flag in config.toml")
-			http.Error(w, "Protocols feature is disabled", 400)
+		if !enableEventSchemasFeature {
+			gateway.logger.Debug("EventSchemas feature is disabled. You can enabled it through enableEventSchemasFeature flag in config.toml")
+			http.Error(w, "EventSchemas feature is disabled", 400)
 			return
 		}
 
-		if gateway.protocolHandler == nil {
-			gateway.logger.Debug("Protocols feature is enterprise only feature.")
-			http.Error(w, "Protocols feature is enterprise only feature", 400)
+		if gateway.eventSchemaHandler == nil {
+			gateway.logger.Debug("EventSchemas feature is enterprise only feature.")
+			http.Error(w, "EventSchemas feature is enterprise only feature", 400)
 			return
 		}
 		wrappedFunc(w, r)
@@ -869,14 +869,14 @@ func (gateway *HandleT) StartWebHandler() {
 	srvMux.HandleFunc("/v1/webhook", gateway.stat(gateway.webhookHandler.RequestHandler))
 	srvMux.HandleFunc("/beacon/v1/batch", gateway.stat(gateway.beaconBatchHandler))
 
-	// Protocols
-	if enableProtocolsFeature && gateway.protocolHandler != nil {
-		srvMux.HandleFunc("/schemas/event-models", gateway.protocolWebHandler(gateway.protocolHandler.GetEventModels))
-		srvMux.HandleFunc("/schemas/event-versions", gateway.protocolWebHandler(gateway.protocolHandler.GetEventVersions))
-		srvMux.HandleFunc("/schemas/event-model/{EventID}/key-counts", gateway.protocolWebHandler(gateway.protocolHandler.GetKeyCounts))
-		srvMux.HandleFunc("/schemas/event-model/{EventID}/metadata", gateway.protocolWebHandler(gateway.protocolHandler.GetEventModelMetadata))
-		srvMux.HandleFunc("/schemas/event-version/{VersionID}/metadata", gateway.protocolWebHandler(gateway.protocolHandler.GetSchemaVersionMetadata))
-		srvMux.HandleFunc("/schemas/event-version/{VersionID}/missing-keys", gateway.protocolWebHandler(gateway.protocolHandler.GetSchemaVersionMissingKeys))
+	// EventSchemas
+	if enableEventSchemasFeature && gateway.eventSchemaHandler != nil {
+		srvMux.HandleFunc("/schemas/event-models", gateway.eventSchemaWebHandler(gateway.eventSchemaHandler.GetEventModels))
+		srvMux.HandleFunc("/schemas/event-versions", gateway.eventSchemaWebHandler(gateway.eventSchemaHandler.GetEventVersions))
+		srvMux.HandleFunc("/schemas/event-model/{EventID}/key-counts", gateway.eventSchemaWebHandler(gateway.eventSchemaHandler.GetKeyCounts))
+		srvMux.HandleFunc("/schemas/event-model/{EventID}/metadata", gateway.eventSchemaWebHandler(gateway.eventSchemaHandler.GetEventModelMetadata))
+		srvMux.HandleFunc("/schemas/event-version/{VersionID}/metadata", gateway.eventSchemaWebHandler(gateway.eventSchemaHandler.GetSchemaVersionMetadata))
+		srvMux.HandleFunc("/schemas/event-version/{VersionID}/missing-keys", gateway.eventSchemaWebHandler(gateway.eventSchemaHandler.GetSchemaVersionMissingKeys))
 	}
 
 	c := cors.New(cors.Options{
@@ -1047,8 +1047,8 @@ func (gateway *HandleT) Setup(application app.Interface, backendConfig backendco
 		gateway.suppressUserHandler = application.Features().SuppressUser.Setup(gateway.backendConfig)
 	}
 
-	if gateway.application.Features().Protocols != nil {
-		gateway.protocolHandler = application.Features().Protocols.Setup()
+	if gateway.application.Options().EventSchemas != nil {
+		gateway.eventSchemaHandler = application.Options().EventSchemas.Setup()
 	}
 
 	rruntime.Go(func() {

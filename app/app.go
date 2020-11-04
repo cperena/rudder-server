@@ -6,7 +6,6 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
-
 	"github.com/rudderlabs/rudder-server/utils/logger"
 )
 
@@ -38,7 +37,9 @@ func (a *App) Setup() {
 	if a.options.Cpuprofile != "" {
 		a.initCPUProfiling()
 	}
-
+	if eventSchemasFeatureSetup != nil {
+		a.options.EventSchemas = eventSchemasFeatureSetup(a)
+	}
 	// initialize enterprise features, if available
 	a.initEnterpriseFeatures()
 }
@@ -66,10 +67,6 @@ func (a *App) initEnterpriseFeatures() {
 
 	if suppressUserFeatureSetup != nil {
 		a.features.SuppressUser = suppressUserFeatureSetup(a)
-	}
-
-	if protocolsFeatureSetup != nil {
-		a.features.Protocols = protocolsFeatureSetup(a)
 	}
 
 	if configEnvFeatureSetup != nil {

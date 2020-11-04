@@ -73,7 +73,7 @@ type HandleT struct {
 	userJobPQ                    pqT
 	userPQLock                   sync.Mutex
 	logger                       logger.LoggerI
-	protocolHandler              types.ProtocolsI
+	eventSchemaHandler           types.EventSchemasI
 }
 
 type DestStatT struct {
@@ -195,8 +195,8 @@ func (proc *HandleT) Setup(application app.Interface, backendConfig backendconfi
 	proc.transformer.Setup()
 
 	proc.crashRecover()
-	if proc.application.Features().Protocols != nil {
-		proc.protocolHandler = application.Features().Protocols.Setup()
+	if proc.application.Options().EventSchemas != nil {
+		proc.eventSchemaHandler = application.Options().EventSchemas.Setup()
 	}
 	if proc.processSessions {
 		proc.logger.Info("Starting session processor")
@@ -236,7 +236,7 @@ var (
 	configSubscriberLock                sync.RWMutex
 	customDestinations                  []string
 	pkgLogger                           logger.LoggerI
-	enableProtocolsFeature              bool
+	enableEventSchemasFeature           bool
 )
 
 func loadConfig() {
@@ -251,7 +251,7 @@ func loadConfig() {
 	configProcessSessions = config.GetBool("Processor.processSessions", false)
 	rawDataDestinations = []string{"S3", "GCS", "MINIO", "RS", "BQ", "AZURE_BLOB", "SNOWFLAKE", "POSTGRES", "CLICKHOUSE", "DIGITAL_OCEAN_SPACES"}
 	customDestinations = []string{"KAFKA", "KINESIS", "AZURE_EVENT_HUB"}
-	enableProtocolsFeature = config.GetBool("EventSchemas.enableEventSchemasFeature", true)
+	enableEventSchemasFeature = config.GetBool("EventSchemas.enableEventSchemasFeature", true)
 	dbReadBatchSize = minDBReadBatchSize
 }
 
@@ -1022,8 +1022,8 @@ func (proc *HandleT) handlePendingGatewayJobs() bool {
 
 	for _, unprocessedJob := range unprocessedList {
 		writeKey := gjson.GetBytes(unprocessedJob.EventPayload, "writeKey").Str
-		if enableProtocolsFeature && proc.protocolHandler != nil {
-			proc.protocolHandler.RecordEventSchema(writeKey, string(unprocessedJob.EventPayload))
+		if enableEventSchemasFeature && proc.eventSchemaHandler != nil {
+			proc.eventSchemaHandler.RecordEventSchema(writeKey, string(unprocessedJob.EventPayload))
 		}
 	}
 	// handle pending jobs
