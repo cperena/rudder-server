@@ -27,6 +27,7 @@ import (
 	"github.com/rudderlabs/rudder-server/utils/types"
 	uuid "github.com/satori/go.uuid"
 	"github.com/tidwall/gjson"
+	"github.com/rudderlabs/rudder-server/event-schema"
 )
 
 //HandleT is an handle to this object used in main.go
@@ -188,16 +189,15 @@ func (proc *HandleT) Setup(application app.Interface, backendConfig backendconfi
 		"module": "batch_router",
 	})
 	proc.destStats = make(map[string]*DestStatT)
-
+	if enableEventSchemasFeature {
+		proc.eventSchemaHandler = event_schema.Setup()
+	}
 	rruntime.Go(func() {
 		proc.backendConfigSubscriber()
 	})
 	proc.transformer.Setup()
 
 	proc.crashRecover()
-	if proc.application.Options().EventSchemas != nil {
-		proc.eventSchemaHandler = application.Options().EventSchemas.Setup()
-	}
 	if proc.processSessions {
 		proc.logger.Info("Starting session processor")
 		rruntime.Go(func() {

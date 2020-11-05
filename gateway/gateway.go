@@ -41,7 +41,7 @@ import (
 	"github.com/rudderlabs/rudder-server/utils/misc"
 	"github.com/rudderlabs/rudder-server/utils/types"
 	uuid "github.com/satori/go.uuid"
-
+	"github.com/rudderlabs/rudder-server/event-schema"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -1047,8 +1047,8 @@ func (gateway *HandleT) Setup(application app.Interface, backendConfig backendco
 		gateway.suppressUserHandler = application.Features().SuppressUser.Setup(gateway.backendConfig)
 	}
 
-	if gateway.application.Options().EventSchemas != nil {
-		gateway.eventSchemaHandler = application.Options().EventSchemas.Setup()
+	if enableEventSchemasFeature {
+		gateway.eventSchemaHandler = event_schema.Setup()
 	}
 
 	rruntime.Go(func() {

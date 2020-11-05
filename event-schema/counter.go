@@ -4,14 +4,14 @@ import (
 	"encoding/json"
 
 	"github.com/rudderlabs/rudder-server/config"
-	"github.com/rudderlabs/rudder-server/event-schema/countish"
+	"github.com/rudderlabs/rudder-server/event-schema/analytics"
 )
 
 type CounterTypeT string
 
 const (
 	LossyCount    CounterTypeT = "LossyCount"
-	StickySampler CounterTypeT = "StickySampler"
+	StickySampler CounterTypeT = "StickySamplerT"
 )
 
 var defaultCounterType CounterTypeT
@@ -23,18 +23,18 @@ type FrequencyCounter struct {
 	Counter     interface{}
 }
 
-func (fc *FrequencyCounter) getCounter() countish.Counter {
+func (fc *FrequencyCounter) getCounter() analytics.Counter {
 	switch fc.CounterType {
 	case LossyCount:
-		return fc.Counter.(*countish.LossyCounter)
+		return fc.Counter.(*analytics.LossyCounterT)
 	case StickySampler:
-		return fc.Counter.(*countish.StickySampler)
+		return fc.Counter.(*analytics.StickySamplerT)
 	default:
 		panic("Unexpected countertype") //TODO: Handle it in a better way
 	}
 }
 
-func (fc *FrequencyCounter) setCounter(counterType CounterTypeT, counter countish.Counter) {
+func (fc *FrequencyCounter) setCounter(counterType CounterTypeT, counter analytics.Counter) {
 	fc.Counter = counter
 	fc.CounterType = counterType
 }
@@ -42,7 +42,7 @@ func (fc *FrequencyCounter) setCounter(counterType CounterTypeT, counter countis
 func init() {
 	counterTypeStr := config.GetString("EventSchemas.counterType", "LossyCount")
 
-	// Output every elem has appeared at least (N * support) times
+	// Output every elem has appeared at least (Counter * support) times
 	counterSupport = config.GetFloat64("EventSchemas.counterSupport", 0.01)
 
 	// We can start with support/10
@@ -65,11 +65,11 @@ func init() {
 func NewFrequencyCounter(name string) *FrequencyCounter {
 	fc := FrequencyCounter{}
 	fc.Name = name
-	var counter countish.Counter
+	var counter analytics.Counter
 	if defaultCounterType == LossyCount {
-		counter = countish.NewLossyCounter(counterSupport, counterErrorTolerance)
+		counter = analytics.NewLossyCounter(counterSupport, counterErrorTolerance)
 	} else {
-		counter = countish.NewSampler(counterSupport, counterErrorTolerance, counterFailureProb)
+		counter = analytics.NewSampler(counterSupport, counterErrorTolerance, counterFailureProb)
 	}
 	fc.setCounter(defaultCounterType, counter)
 	return &fc
@@ -79,25 +79,25 @@ func NewPeristedFrequencyCounter(persistedFc *FrequencyCounter) *FrequencyCounte
 	fc := FrequencyCounter{}
 	fc.Name = persistedFc.Name
 	var cType CounterTypeT
-	var counter countish.Counter
+	var counter analytics.Counter
 
 	if persistedFc.CounterType == LossyCount {
-		var lc countish.LossyCounter
+		var lc analytics.LossyCounterT
 		persistedFcJSON, _ := json.Marshal(persistedFc.Counter)
 		err := json.Unmarshal(persistedFcJSON, &lc)
 		if err != nil {
 			panic(err)
 		}
-		counter = countish.Counter(&lc)
+		counter = analytics.Counter(&lc)
 		cType = LossyCount
 	} else {
-		var ss countish.StickySampler
+		var ss analytics.StickySamplerT
 		persistedFcJSON, _ := json.Marshal(persistedFc.Counter)
 		err := json.Unmarshal(persistedFcJSON, &ss)
 		if err != nil {
 			panic(err)
 		}
-		counter = countish.Counter(&ss)
+		counter = analytics.Counter(&ss)
 		cType = StickySampler
 	}
 
@@ -113,6 +113,6 @@ func (fc *FrequencyCounter) Observe(key string) {
 func getCounterSupport(key string) float64 {
 	return counterSupport
 }
-func (fc *FrequencyCounter) ItemsAboveThreshold() []countish.Entry {
+func (fc *FrequencyCounter) ItemsAboveThreshold() []analytics.EntryT {
 	return fc.getCounter().ItemsAboveThreshold(counterThreshold)
 }

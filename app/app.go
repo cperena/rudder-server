@@ -37,9 +37,6 @@ func (a *App) Setup() {
 	if a.options.Cpuprofile != "" {
 		a.initCPUProfiling()
 	}
-	if eventSchemasFeatureSetup != nil {
-		a.options.EventSchemas = eventSchemasFeatureSetup(a)
-	}
 	// initialize enterprise features, if available
 	a.initEnterpriseFeatures()
 }

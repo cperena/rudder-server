@@ -36,7 +36,6 @@ import (
 	"github.com/jeremywohl/flatten"
 	"github.com/lib/pq"
 
-	"github.com/rudderlabs/rudder-server/app"
 	"github.com/rudderlabs/rudder-server/config"
 	"github.com/rudderlabs/rudder-server/jobsdb"
 	"github.com/rudderlabs/rudder-server/rruntime"
@@ -144,10 +143,6 @@ func loadConfig() {
 
 func init() {
 	loadConfig()
-
-	app.RegisterEventSchemaFeature(func(a app.Interface) app.EventSchemaFeature {
-		return &eventSchemasFeatureImpl{}
-	})
 }
 
 //RecordEventSchema : Records event schema for every event in the batch

@@ -1,6 +1,6 @@
-package countish
+package analytics
 
-type Entry struct {
+type EntryT struct {
 	Key       string
 	Frequency float64
 }
